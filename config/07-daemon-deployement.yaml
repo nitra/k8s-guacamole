@@ -2,7 +2,6 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: guacamole-daemon
-  namespace: netboot-guacamole
 spec:
   selector:
     matchLabels:
@@ -16,6 +15,7 @@ spec:
       containers:
       - name: guacamole-daemon
         image:  guacamole/guacd
+        imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 4822
         readinessProbe:

@@ -10,57 +10,37 @@ You can see below a simple demo of Guacamole :
 
 [![Watch the video](assets/k8s-guacamole-preview.png)](https://youtu.be/AjuHJHtd4zU)
 
-## Install required dependencies
+## Install 
 
-This Guacamole configuration use [cert-manager](https://github.com/thomas-illiet/k8s-infrastructure/tree/master/config/cert-manager) and [ingress-nginx](https://github.com/thomas-illiet/k8s-infrastructure/tree/master/config/ingress-nginx), the configuration of these are stored in my [kubernetes infrastructure](https://github.com/thomas-illiet/k8s-infrastructure/) repository.
-
-## Initializing the MySQL database
-
-If your database is not already initialized with the Guacamole schema, you will need to do so prior to using Guacamole. A convenience script for generating the necessary SQL to do this is included in the Guacamole image.
-
-run this command in your kubernetes worker to generate a SQL script :
 
 ```bash
-docker exec -i <APP CONTAINER ID> /opt/guacamole/bin/initdb.sh --mysql > /tmp/initdb.sql
-```
 
-And import `initdb.sql` to mariadb docker intance with the following command :
+Создаем БД guacamole_db
 
-```bash
-docker exec -i <DB CONTAINER ID> mysql -uguacamole -p<DB PASSWORD> guacamole < /tmp/test.sql
-```
+Генерируем скрипт со схемой данных
+docker run --rm guacamole/guacamole /opt/guacamole/bin/initdb.sh --postgres > initdb.sql
 
-## Add Oauth2 to better protect your Guacamole instance
+Копируем и выполняем на сервере БД
+pbcopy < initdb.sql
 
-If you want to add a second authentication to better protect your Guacamole instance, you must first add the Oauth2 configuration files available in the following github repository [k8s-oauth2-proxy](https://github.com/thomas-illiet/k8s-oauth2-proxy).
+Create a user for Guacamole within PostgreSQL with access to the tables and sequences of this database, such as guacamole_user.
 
-Add the following annotations in your ingress configuration to redirect unauthenticated users to your oauth2 proxy.
+CREATE USER guacamole_user WITH PASSWORD 'some_password';
 
-```bash
-nginx.ingress.kubernetes.io/auth-url: "https://$host/oauth2/auth"
-nginx.ingress.kubernetes.io/auth-signin: "https://$host/oauth2/start"
-```
+GRANT SELECT,INSERT,UPDATE,DELETE ON ALL TABLES IN SCHEMA public TO guacamole_user;
 
-To complete oauth2 configuration, add the following code to your input configuration.
+GRANT SELECT,USAGE ON ALL SEQUENCES IN SCHEMA public TO guacamole_user;
 
-```bash
----
-apiVersion: extensions/v1beta1
-kind: Ingress
-metadata:
-  name: guacamole-oauth2
-  namespace: netboot-guacamole
-spec:
-  tls:
-  - hosts:
-    - sc6rffd3d5.netboot.fr
-    secretName: guacamole-netboot-fr-tls
-  rules:
-  - host: sc6rffd3d5.netboot.fr
-    http:
-      paths:
-      - path: /oauth2
-        backend:
-          serviceName: guacamole-oauth2
-          servicePort: guacamole-oauth2
+
+kubectl apply -f 01-namespace.yaml  
+
+kubectl apply -f 07-daemon-deployement.yaml
+
+kubectl apply -f 06-daemon-service.yaml 
+
+kubectl apply -f configmap.yaml 
+
+kubectl apply -f 09-app-deployment.yaml
+
+kubectl apply -f 08-app-service.yaml 
 ```
